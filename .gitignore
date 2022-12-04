@@ -1,0 +1,14 @@
+/Documents/QuantLaneNet/
+
+/Source_Code/Software/__pycache__/
+/Source_Code/Software/dataset/
+/Source_Code/Software/conv_output/
+
+/Source_Code/Hardware/Results/
+/Source_Code/Hardware/Zedboard/*
+!/Source_Code/Hardware/Zedboard/ip_repo/
+!/Source_Code/Hardware/Zedboard/zedboard.tcl
+
+/Source_Code/Hardware/Convolutional/*
+!/Source_Code/Hardware/Convolutional/Convolutional.srcs/
+/Source_Code/Hardware/Convolutional/Convolutional.srcs/utils_1
