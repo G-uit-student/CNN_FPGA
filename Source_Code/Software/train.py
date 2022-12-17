@@ -56,7 +56,7 @@ def train (model, optimizer, criterion, train_loader, test_loader, epochs):
         print("Test set: Avg. loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)".format(loss, accuracy, len(test_loader.dataset), 100.*accuracy))
 
         if (accuracy > best_accuracy):
-            torch.save(model.state_dict(), "./model.pth")
+            torch.save(model.state_dict(), "./weights/model.pth")
             best_accuracy = accuracy
 
     return model

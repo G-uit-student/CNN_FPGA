@@ -2,8 +2,7 @@ import torch
 import torch.nn as nn
 import torchvision
 from model import Network
-from torch.optim import Adam
-from tqdm import tqdm
+from torch.quantization.observer import MovingAverageMinMaxObserver
 
 
 def evaluate (model, criterion, data_loader):
@@ -25,33 +24,6 @@ def evaluate (model, criterion, data_loader):
     return loss, accuracy
 
 
-def train (model, optimizer, criterion, train_loader, test_loader, epochs):
-    for epoch in range(epochs):
-
-        # train
-        model.train()
-        with tqdm  (train_loader, unit="batch") as tepoch:
-            for data, target in tepoch:
-                tepoch.set_description(f"Epoch {epoch+1}")
-
-                optimizer.zero_grad()
-
-                out = model(data)
-                loss = criterion(out, target)
-
-                loss.backward()
-                optimizer.step()
-
-                tepoch.set_postfix(loss=loss.item())
-
-        # evaluate
-        loss, accuracy = evaluate(model, criterion, test_loader)
-
-        print("Test set: Avg. loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)".format(loss, accuracy, len(test_loader.dataset), 100.*accuracy))
-
-    return model
-
-
 if __name__ == "__main__":
     batch_size_train = 32
     batch_size_test = 1000
@@ -59,14 +31,12 @@ if __name__ == "__main__":
 
     # initialize model
     model = Network()
-    model.load_state_dict(torch.load("./model.pth"))
-    model.to("cpu")
+    model.load_state_dict(torch.load("./model.pth", map_location="cpu"))
 
     transform = torchvision.transforms.Compose([
         torchvision.transforms.ToTensor(),
     ])
 
-    optimizer = Adam(model.parameters(), lr=learning_rate)
     criterion = nn.CrossEntropyLoss()
 
     # load dataset
@@ -76,16 +46,23 @@ if __name__ == "__main__":
     test_dataset = torchvision.datasets.MNIST("./dataset", train=False, download=True, transform=transform)
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size_test, shuffle=True)
 
+    model.eval()
     model.fuse_model()
-    model.qconfig = torch.quantization.get_default_qconfig("qnnpack")
+    model.qconfig = torch.quantization.QConfig(
+        activation=MovingAverageMinMaxObserver.with_args(qscheme=torch.per_tensor_symmetric, dtype=torch.quint8),
+        weight=MovingAverageMinMaxObserver.with_args(qscheme=torch.per_tensor_symmetric, dtype=torch.qint8)
+    )
 
-    model.train()
-    torch.quantization.prepare_qat(model, inplace=True)
+    print(model.qconfig)
 
-    print('Training Quantization model...')
-    train(model, optimizer, criterion, train_loader, test_loader, 5)
+    torch.quantization.prepare(model, inplace=True)
+    print('Post Training Quantization Prepare')
+
+    evaluate(model, criterion, train_loader)
+    print('Post Training Quantization: Calibration done')
 
     torch.quantization.convert(model, inplace=True)
+    print('Post Training Quantization: Convert done')
 
     loss, accuracy = evaluate(model, criterion, test_loader)
     print("Test set: Avg. loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)".format(loss, accuracy, len(test_loader.dataset), 100.*accuracy))
